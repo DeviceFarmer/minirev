@@ -1,0 +1,21 @@
+{
+  "name": "@devicefarmer/minirev-prebuilt",
+  "version": "1.0.0",
+  "description": "Prebuilt binaries of minirev.",
+  "keywords": [
+    "minirev"
+  ],
+  "license": "Apache-2.0",
+  "author": {
+    "name": "The DeviceFarmer Project",
+    "email": "support@devicefarmer.com",
+    "url": "https://devicefarmer.github.io/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/devicefarmer/minirev.git"
+  },
+  "scripts": {
+    "prepublish": "make"
+  }
+}
