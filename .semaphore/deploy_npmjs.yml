@@ -1,14 +1,14 @@
 version: v1.0
-name: Android
+name: Deploy to npmjs
 agent:
   machine:
     type: e1-standard-2
     os_image: ubuntu2204
 blocks:
-  - name: Gradle
+  - name: Deploy to npmjs
     task:
       jobs:
-        - name: Build
+        - name: Deploy
           commands:
             - sem-version java 17
             - wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O ~/android-commandline-tools.zip
@@ -19,12 +19,12 @@ blocks:
             - yes | sdkmanager "ndk;29.0.14206865"
             - export PATH=$PATH:~/android-sdk/ndk/29.0.14206865/
             - export ANDROID_SDK_ROOT=~/android-sdk
+            - sem-version node 22
             - checkout
             - git submodule init
             - git submodule update
-            - make
-promotions:
-  - name: Deploy to npmjs
-    pipeline_file: deploy_npmjs.yml
-    auto_promote:
-      when: tag =~ '.*' AND result = 'passed'
+            - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+            - npm install
+            - npm publish --access=public
+      secrets:
+        - name: npmjs
