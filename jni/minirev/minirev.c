@@ -8,6 +8,7 @@
 #include <string.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
+#include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/un.h>
