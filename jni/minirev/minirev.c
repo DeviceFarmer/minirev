@@ -3,11 +3,13 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <netinet/in.h>
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
+#include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/un.h>
@@ -96,7 +98,7 @@ start_inet_server(int port)
   memset(&addr, 0, sizeof(addr));
   addr.sin_family = AF_INET;
   addr.sin_port = htons(port);
-  addr.sin_addr.s_addr = INADDR_ANY;
+  addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
   if (setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) < 0)
   {
@@ -115,28 +117,41 @@ start_inet_server(int port)
   return sfd;
 }
 
+// How long a write may wait for a full send buffer to drain before the socket is given up.
+#define PUMP_TIMEOUT_MS 30000
+
 static int
 pump(int fd, const void* buf, size_t count)
 {
-  int n = 0;
+  size_t done = 0;
 
-  do
+  while (done < count)
   {
-    n = write(fd, buf + n, count - n);
+    ssize_t n = write(fd, (const char*) buf + done, count - done);
 
     if (n < 0)
     {
+      if (errno == EINTR)
+        continue;
+
+      // Every socket here is non-blocking: a full send buffer is EAGAIN, so wait for it to drain instead of
+      // retrying from the wrong offset (which re-sent the data with a stray byte in front).
       if ((errno == EAGAIN) || (errno == EWOULDBLOCK))
       {
-        // @todo
+        struct pollfd pfd = { .fd = fd, .events = POLLOUT };
+
+        if (poll(&pfd, 1, PUMP_TIMEOUT_MS) > 0)
+          continue;
       }
 
       perror("write");
+      return -1;
     }
-  }
-  while (n < count);
 
-  return n;
+    done += n;
+  }
+
+  return (int) done;
 }
 
 static void
@@ -424,9 +439,8 @@ handle_control_read(event_source_t** sources, event_source_t* source, int efd)
         {
           if (pump(source->target, buf + cursor, source->mplength) < 0)
           {
-            D("%6d delete_reason_1\n", source->fd);
-            delete_source(sources, source);
-            return -1;
+            D("%6d delete_reason_1\n", source->target);
+            delete_source_by_fd(sources, source->target);
           }
         }
 
@@ -443,9 +457,8 @@ handle_control_read(event_source_t** sources, event_source_t* source, int efd)
         {
           if (pump(source->target, buf + cursor, count - cursor) < 0)
           {
-            D("%6d delete_reason_2\n", source->fd);
-            delete_source(sources, source);
-            return -1;
+            D("%6d delete_reason_2\n", source->target);
+            delete_source_by_fd(sources, source->target);
           }
         }
 
@@ -556,7 +569,12 @@ handle_forward_read(event_source_t** sources, event_source_t* source)
 
     if (pump(source->target, buf, HEADER_SIZE + count) < 0)
     {
-      break;
+      // A frame may be half written, so the control stream is out of sync: drop the control connection (and
+      // with it every forward connection, this one included) so the host sees it close and reconnects,
+      // instead of reading garbage frames.
+      D("%6d delete_reason_12\n", source->target);
+      delete_source_by_fd(sources, source->target);
+      return -1;
     }
   }
 
