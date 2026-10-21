@@ -33,7 +33,8 @@ typedef struct
   // Target if applicable.
   int target;
   // The multiplex current header buffer. This could be removed with trickery.
-  char mpheader[HEADER_SIZE];
+  // unsigned: plain char is signed on x86, so a header byte >= 0x80 decoded negative (port 8443 -> 8187)
+  unsigned char mpheader[HEADER_SIZE];
   // How many bytes we still need to get for the current target. If negative,
   // we're waiting for a header.
   int mplength;
