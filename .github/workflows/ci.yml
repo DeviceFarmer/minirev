@@ -25,7 +25,9 @@ jobs:
       - name: Install the NDK
         run: |
           set -euo pipefail
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;$NDK_VERSION" >/dev/null
+          # yes dies of SIGPIPE when sdkmanager exits early, which pipefail would
+          # otherwise turn into a failure.
+          (yes || true) | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;$NDK_VERSION" >/dev/null
           echo "$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_PATH"
 
       - name: Build
