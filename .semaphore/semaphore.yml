@@ -23,8 +23,3 @@ blocks:
             - git submodule init
             - git submodule update
             - make
-promotions:
-  - name: Deploy to npmjs
-    pipeline_file: deploy_npmjs.yml
-    auto_promote:
-      when: tag =~ '.*' AND result = 'passed'
