@@ -1,8 +1,8 @@
 /.editorconfig
 /.env
+/.github/
 /.gitmodules
 /.npmignore
-/.semaphore/
 /*.tgz
 /CONTRIBUTING.md
 /jni/
